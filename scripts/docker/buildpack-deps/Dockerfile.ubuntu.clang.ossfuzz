@@ -188,7 +188,15 @@ RUN set -ex; \
 	cp abicoder.hpp /usr/include; \
 	rm -rf /usr/src/Yul-Isabelle
 
+# HEVM
+# FIXME: download hevm binary from the latest release when it supports --code-a-file
+# https://github.com/ethereum/hevm/blob/4a3900ef9034b3c1569ab2d21f28d1464d2d6de6/CHANGELOG.md#v0543
+FROM nixos/nix:2.29.1 AS hevm-builder
+RUN nix build --extra-experimental-features "nix-command flakes" github:ethereum/hevm#redistributable --out-link hevm
+RUN cp hevm/bin/hevm /hevm-x86_64-linux
+
 FROM base
+COPY --from=hevm-builder /hevm-x86_64-linux /usr/bin/hevm
 COPY --from=libraries /usr/lib /usr/lib
 COPY --from=libraries /usr/bin /usr/bin
 COPY --from=libraries /usr/include /usr/include
