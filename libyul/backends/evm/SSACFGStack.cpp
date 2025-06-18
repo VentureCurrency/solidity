@@ -48,7 +48,7 @@ std::string ssa::slotToString(StackSlot const& _slot, SSACFG const& _cfg)
 
 std::string ssa::stackToString(StackData const& _stackData, SSACFG const& _cfg)
 {
-	return format(
+	return fmt::format(
 		"[{}]",
 		fmt::join(_stackData | ranges::views::transform([&](auto const& _slot) { return slotToString(_slot, _cfg); }), ", ")
 	);
