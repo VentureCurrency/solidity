@@ -4,5 +4,6 @@ contract A {
 contract C is A {
     uint constant CONST = 2 + A.INHERITED;
     uint[CONST] array;
+    uint[1 + A.INHERITED + 2] array2;
 }
 // ----
