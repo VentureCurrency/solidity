@@ -414,19 +414,22 @@ void ConstantEvaluator::endVisit(MemberAccess const& _memberAccess)
 {
 	if (auto const* parentIdentifier = dynamic_cast<Identifier const*>(&_memberAccess.expression()))
 	{
-		if (auto const* contract = dynamic_cast<ContractDefinition const*>(parentIdentifier->annotation().referencedDeclaration))
+		Declaration const* referencedDeclaration = parentIdentifier->annotation().referencedDeclaration;
+		std::vector<VariableDeclaration const*> candidateVariables;
+		if (auto const* contract = dynamic_cast<ContractDefinition const*>(referencedDeclaration))
+			candidateVariables = contract->stateVariables();
+		else if (auto const* import = dynamic_cast<ImportDirective const*>(referencedDeclaration))
 		{
-			auto contractVariables = contract->stateVariables();
-			auto variable = ranges::find_if(
-				contractVariables,
-				[&](VariableDeclaration const* _variable) { return _variable->name() == _memberAccess.memberName(); }
-			);
-
-			if (
-				variable != ranges::end(contractVariables) &&
-				(*variable)->isConstant()
-			)
-				m_values[&_memberAccess] = evaluate(**variable);
+			if (SourceUnit const* sourceUnit = import->annotation().sourceUnit)
+				candidateVariables = ASTNode::filteredNodes<VariableDeclaration>(sourceUnit->nodes());
 		}
+
+		auto variable = ranges::find_if(
+			candidateVariables,
+			[&](VariableDeclaration const* _variable) { return _variable->name() == _memberAccess.memberName(); }
+		);
+
+		if (variable != ranges::end(candidateVariables) && (*variable)->isConstant())
+			m_values[&_memberAccess] = evaluate(**variable);
 	}
 }
