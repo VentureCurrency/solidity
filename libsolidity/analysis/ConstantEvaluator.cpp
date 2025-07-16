@@ -412,10 +412,29 @@ void ConstantEvaluator::endVisit(TupleExpression const& _tuple)
 
 void ConstantEvaluator::endVisit(MemberAccess const& _memberAccess)
 {
-	if (auto const* parentIdentifier = dynamic_cast<Identifier const*>(&_memberAccess.expression()))
+	std::vector<VariableDeclaration const*> candidateVariables;
+	if (auto const* nestedMemberAccess = dynamic_cast<MemberAccess const*>(&_memberAccess.expression()))
+	{
+		// The nested expression can only be accessing a contract inside an imported module
+		auto const* moduleIdentifier = dynamic_cast<Identifier const*>(&nestedMemberAccess->expression());
+		solAssert(moduleIdentifier);
+		auto const* importedModule = dynamic_cast<ImportDirective const*>(moduleIdentifier->annotation().referencedDeclaration);
+		solAssert(importedModule);
+		SourceUnit const* sourceUnit = importedModule->annotation().sourceUnit;
+		solAssert(sourceUnit);
+
+		auto contracts = ASTNode::filteredNodes<ContractDefinition>(sourceUnit->nodes());
+		auto contract = ranges::find_if(
+			contracts,
+			[&](ContractDefinition const* _contract) { return _contract->name() == nestedMemberAccess->memberName(); }
+		);
+		if (contract != ranges::end(contracts))
+			candidateVariables = (*contract)->stateVariables();
+
+	}
+	else if (auto const* parentIdentifier = dynamic_cast<Identifier const*>(&_memberAccess.expression()))
 	{
 		Declaration const* referencedDeclaration = parentIdentifier->annotation().referencedDeclaration;
-		std::vector<VariableDeclaration const*> candidateVariables;
 		if (auto const* contract = dynamic_cast<ContractDefinition const*>(referencedDeclaration))
 			candidateVariables = contract->stateVariables();
 		else if (auto const* import = dynamic_cast<ImportDirective const*>(referencedDeclaration))
@@ -423,13 +442,13 @@ void ConstantEvaluator::endVisit(MemberAccess const& _memberAccess)
 			if (SourceUnit const* sourceUnit = import->annotation().sourceUnit)
 				candidateVariables = ASTNode::filteredNodes<VariableDeclaration>(sourceUnit->nodes());
 		}
-
-		auto variable = ranges::find_if(
-			candidateVariables,
-			[&](VariableDeclaration const* _variable) { return _variable->name() == _memberAccess.memberName(); }
-		);
-
-		if (variable != ranges::end(candidateVariables) && (*variable)->isConstant())
-			m_values[&_memberAccess] = evaluate(**variable);
 	}
+
+	auto variable = ranges::find_if(
+		candidateVariables,
+		[&](VariableDeclaration const* _variable) { return _variable->name() == _memberAccess.memberName(); }
+	);
+
+	if (variable != ranges::end(candidateVariables) && (*variable)->isConstant())
+		m_values[&_memberAccess] = evaluate(**variable);
 }
