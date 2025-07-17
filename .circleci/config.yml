@@ -578,6 +578,14 @@ defaults:
         MAKEFLAGS: -j 5
         CPUs: 5
 
+  - base_ubuntu2204_arm: &base_ubuntu2204_arm
+      <<: *base_ubuntu2004
+      resource_class: arm.medium
+      environment: &base_ubuntu2204_large_env
+        <<: *base_ubuntu2204_env
+        MAKEFLAGS: -j 5
+        CPUs: 5
+
   - base_ubuntu2204_clang: &base_ubuntu2204_clang
       docker:
         - image: << pipeline.parameters.ubuntu-2204-docker-image >>
@@ -1117,6 +1125,13 @@ jobs:
     environment:
       <<: *base_ubuntu2204_clang_large_env
       MAKEFLAGS: -j 10
+    steps:
+      - checkout
+      - run_build
+      - matrix_notify_failure_unless_pr
+
+  b_ubu_2204_arm:
+    <<: *base_ubuntu2204_arm
     steps:
       - checkout
       - run_build
@@ -1913,6 +1928,9 @@ workflows:
       - b_ubu_clang: *requires_nothing
       - t_ubu_clang_soltest: *requires_b_ubu_clang
       - t_ubu_lsp: *requires_b_ubu
+
+      # Ubuntu arm build and tests
+      - b_ubu_2204_arm: *requires_nothing
 
       # Ubuntu fake release build and tests
       - b_ubu_force_release: *requires_nothing
