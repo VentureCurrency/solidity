@@ -415,14 +415,16 @@ void ConstantEvaluator::endVisit(MemberAccess const& _memberAccess)
 	std::vector<VariableDeclaration const*> candidateVariables;
 	if (auto const* nestedMemberAccess = dynamic_cast<MemberAccess const*>(&_memberAccess.expression()))
 	{
-		// The nested expression can only be accessing a contract inside an imported module
+		// The nested expression should be accessing a contract inside an imported module
 		auto const* moduleIdentifier = dynamic_cast<Identifier const*>(&nestedMemberAccess->expression());
-		solAssert(moduleIdentifier);
+		if (!moduleIdentifier)
+			return;
 		auto const* importedModule = dynamic_cast<ImportDirective const*>(moduleIdentifier->annotation().referencedDeclaration);
-		solAssert(importedModule);
+		if (!importedModule)
+			return;
+
 		SourceUnit const* sourceUnit = importedModule->annotation().sourceUnit;
 		solAssert(sourceUnit);
-
 		auto contracts = ASTNode::filteredNodes<ContractDefinition>(sourceUnit->nodes());
 		auto contract = ranges::find_if(
 			contracts,
@@ -430,16 +432,15 @@ void ConstantEvaluator::endVisit(MemberAccess const& _memberAccess)
 		);
 		if (contract != ranges::end(contracts))
 			candidateVariables = (*contract)->stateVariables();
-
 	}
 	else if (auto const* parentIdentifier = dynamic_cast<Identifier const*>(&_memberAccess.expression()))
 	{
 		Declaration const* referencedDeclaration = parentIdentifier->annotation().referencedDeclaration;
 		if (auto const* contract = dynamic_cast<ContractDefinition const*>(referencedDeclaration))
 			candidateVariables = contract->stateVariables();
-		else if (auto const* import = dynamic_cast<ImportDirective const*>(referencedDeclaration))
+		else if (auto const* importedModule = dynamic_cast<ImportDirective const*>(referencedDeclaration))
 		{
-			if (SourceUnit const* sourceUnit = import->annotation().sourceUnit)
+			if (SourceUnit const* sourceUnit = importedModule->annotation().sourceUnit)
 				candidateVariables = ASTNode::filteredNodes<VariableDeclaration>(sourceUnit->nodes());
 		}
 	}
